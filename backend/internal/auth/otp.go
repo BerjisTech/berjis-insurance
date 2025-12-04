@@ -1,14 +1,18 @@
 // Insurance Broker Platform - OTP Management
 // Package: internal/auth
-// Purpose: Generate and verify One-Time Passwords for MFA
+// Purpose: Generate and verify One-Time Passwords for MFA backed by PostgreSQL storage
 
 package auth
 
 import (
+	"context"
 	"crypto/rand"
+	"database/sql"
 	"errors"
-	"fmt"
 	"time"
+
+	"github.com/insurance-broker/backend/internal/models"
+	"github.com/insurance-broker/backend/internal/repository"
 )
 
 const (
@@ -18,75 +22,87 @@ const (
 	OTPExpiry = 10 * time.Minute
 )
 
-// OTPService handles OTP operations
+// OTPService handles OTP operations persisted in the database
 type OTPService struct {
-	// In production, store OTPs in Redis/database with expiry
-	otps map[string]*OTPData
+	repo      *repository.AuthRepository
+	otpLength int
+	ttl       time.Duration
 }
 
-// OTPData stores OTP information
-type OTPData struct {
-	Code      string
-	ExpiresAt time.Time
-	Attempts  int
-}
-
-// NewOTPService creates a new OTP service
-func NewOTPService() *OTPService {
+// NewOTPService creates a new OTP service backed by repository storage
+func NewOTPService(repo *repository.AuthRepository) *OTPService {
 	return &OTPService{
-		otps: make(map[string]*OTPData),
+		repo:      repo,
+		otpLength: OTPLength,
+		ttl:       OTPExpiry,
 	}
 }
 
-// GenerateOTP generates a 6-digit OTP
-func (s *OTPService) GenerateOTP(identifier string) (string, error) {
-	otp, err := generateRandomOTP(OTPLength)
+// GenerateAndStore creates an OTP for the provided identifier + purpose and stores it
+// identifier is typically an email or phone number
+func (s *OTPService) GenerateAndStore(ctx context.Context, userID sql.NullString, identifier, purpose, channel string) (string, error) {
+	code, err := generateRandomOTP(s.otpLength)
 	if err != nil {
 		return "", err
 	}
 
-	s.otps[identifier] = &OTPData{
-		Code:      otp,
-		ExpiresAt: time.Now().Add(OTPExpiry),
-		Attempts:  0,
+	otp := &models.OTPCode{
+		UserID:      userID,
+		Identifier:  identifier,
+		Code:        code,
+		Purpose:     purpose,
+		Channel:     channel,
+		MaxAttempts: 3,
+		ExpiresAt:   time.Now().Add(s.ttl),
 	}
 
-	return otp, nil
+	if _, err := s.repo.CreateOTP(ctx, otp); err != nil {
+		return "", err
+	}
+
+	return code, nil
 }
 
-// VerifyOTP verifies an OTP for the given identifier
-func (s *OTPService) VerifyOTP(identifier, code string) error {
-	data, exists := s.otps[identifier]
-	if !exists {
-		return errors.New("OTP not found")
+// Verify validates the OTP for identifier+purpose and marks it as used if valid
+func (s *OTPService) Verify(ctx context.Context, identifier, purpose, code string) error {
+	otp, err := s.repo.GetActiveOTP(ctx, identifier, purpose)
+	if err != nil {
+		return err
 	}
 
-	if time.Now().After(data.ExpiresAt) {
-		delete(s.otps, identifier)
+	if time.Now().After(otp.ExpiresAt) {
 		return errors.New("OTP expired")
 	}
 
-	data.Attempts++
-	if data.Attempts > 3 {
-		delete(s.otps, identifier)
+	if otp.Attempts >= otp.MaxAttempts {
 		return errors.New("too many attempts")
 	}
 
-	if data.Code != code {
+	if otp.Code != code {
+		attempts, incErr := s.repo.IncrementOTPAttempts(ctx, otp.ID)
+		if incErr == nil && attempts >= otp.MaxAttempts {
+			_ = s.repo.DeleteOTPs(ctx, identifier, purpose)
+		}
 		return errors.New("invalid OTP")
 	}
 
-	// OTP verified successfully, remove it
-	delete(s.otps, identifier)
+	if err := s.repo.MarkOTPVerified(ctx, otp.ID); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// CleanupExpired removes stale OTPs
+func (s *OTPService) CleanupExpired(ctx context.Context) error {
+	return s.repo.CleanupExpiredOTPs(ctx)
 }
 
 // generateRandomOTP generates a random numeric OTP
 func generateRandomOTP(length int) (string, error) {
 	const digits = "0123456789"
 	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
+	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
 
@@ -95,14 +111,4 @@ func generateRandomOTP(length int) (string, error) {
 	}
 
 	return string(b), nil
-}
-
-// CleanExpiredOTPs removes expired OTPs (should be called periodically)
-func (s *OTPService) CleanExpiredOTPs() {
-	now := time.Now()
-	for key, data := range s.otps {
-		if now.After(data.ExpiresAt) {
-			delete(s.otps, key)
-		}
-	}
 }

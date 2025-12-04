@@ -13,9 +13,13 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/insurance-broker/backend/internal/auth"
 	"github.com/insurance-broker/backend/internal/config"
 	"github.com/insurance-broker/backend/internal/database"
+	"github.com/insurance-broker/backend/internal/handlers"
 	"github.com/insurance-broker/backend/internal/middleware"
+	"github.com/insurance-broker/backend/internal/repository"
+	"github.com/insurance-broker/backend/internal/services"
 )
 
 func main() {
@@ -28,6 +32,22 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Initialize auth dependencies
+	jwtService, err := auth.NewJWTService(cfg.JWT.Secret, cfg.JWT.Expiry, cfg.JWT.RefreshExpiry)
+	if err != nil {
+		log.Fatalf("Failed to init JWT service: %v", err)
+	}
+	passwordService := auth.NewPasswordService()
+	authRepo := repository.NewAuthRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	otpService := auth.NewOTPService(authRepo)
+	authService := services.NewAuthService(userRepo, authRepo, jwtService, passwordService, otpService, services.AuthServiceOptions{
+		Env:        cfg.Server.Env,
+		AccessTTL:  cfg.JWT.Expiry,
+		RefreshTTL: cfg.JWT.RefreshExpiry,
+	})
+	authHandler := handlers.NewAuthHandler(authService)
 
 	// Initialize Fiber app with custom config
 	app := fiber.New(fiber.Config{
@@ -116,21 +136,13 @@ func main() {
 
 	// Authentication routes (TODO: implement in next phase)
 	auth := api.Group("/auth")
-	auth.Post("/register", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "Registration endpoint - Coming soon",
-		})
-	})
-	auth.Post("/login", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "Login endpoint - Coming soon",
-		})
-	})
-	auth.Post("/refresh", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "Token refresh endpoint - Coming soon",
-		})
-	})
+	auth.Post("/register", authHandler.Register)
+	auth.Post("/login", authHandler.Login)
+	auth.Post("/refresh", authHandler.RefreshToken)
+	auth.Post("/verify-otp", authHandler.VerifyOTP)
+	auth.Post("/password-reset/request", authHandler.RequestPasswordReset)
+	auth.Post("/password-reset/confirm", authHandler.ResetPassword)
+	auth.Post("/logout", middleware.Protected(&cfg.JWT), authHandler.Logout)
 
 	// Protected routes (require authentication)
 	protected := api.Group("/", middleware.Protected(&cfg.JWT))
