@@ -8,13 +8,24 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums
-CREATE TYPE user_role AS ENUM ('user', 'broker', 'provider_admin', 'system_admin');
-CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'pending_verification');
-CREATE TYPE provider_status AS ENUM ('active', 'inactive', 'pending_approval', 'suspended');
-CREATE TYPE consent_type AS ENUM ('personal_data', 'health_data', 'financial_data', 'communication');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('user', 'broker', 'provider_admin', 'system_admin');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN
+        CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'pending_verification');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'provider_status') THEN
+        CREATE TYPE provider_status AS ENUM ('active', 'inactive', 'pending_approval', 'suspended');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'consent_type') THEN
+        CREATE TYPE consent_type AS ENUM ('personal_data', 'health_data', 'financial_data', 'communication');
+    END IF;
+END $$;
 
 -- Users table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(20) UNIQUE,
@@ -30,13 +41,13 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_phone ON users(phone);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_created_at ON users(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 
 -- Insurance Providers table
-CREATE TABLE insurance_providers (
+CREATE TABLE IF NOT EXISTS insurance_providers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     license_number VARCHAR(100) UNIQUE NOT NULL,
@@ -47,11 +58,11 @@ CREATE TABLE insurance_providers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_providers_status ON insurance_providers(status);
-CREATE INDEX idx_providers_license ON insurance_providers(license_number);
+CREATE INDEX IF NOT EXISTS idx_providers_status ON insurance_providers(status);
+CREATE INDEX IF NOT EXISTS idx_providers_license ON insurance_providers(license_number);
 
 -- User-Provider Consent tracking
-CREATE TABLE user_provider_consents (
+CREATE TABLE IF NOT EXISTS user_provider_consents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider_id UUID NOT NULL REFERENCES insurance_providers(id) ON DELETE CASCADE,
@@ -64,11 +75,11 @@ CREATE TABLE user_provider_consents (
     UNIQUE(user_id, provider_id, consent_type)
 );
 
-CREATE INDEX idx_consents_user ON user_provider_consents(user_id);
-CREATE INDEX idx_consents_provider ON user_provider_consents(provider_id);
+CREATE INDEX IF NOT EXISTS idx_consents_user ON user_provider_consents(user_id);
+CREATE INDEX IF NOT EXISTS idx_consents_provider ON user_provider_consents(provider_id);
 
 -- Encryption Keys table
-CREATE TABLE encryption_keys (
+CREATE TABLE IF NOT EXISTS encryption_keys (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     entity_id UUID NOT NULL,
     entity_type VARCHAR(50) NOT NULL,
@@ -78,7 +89,7 @@ CREATE TABLE encryption_keys (
 );
 
 -- Audit Logs table
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     action VARCHAR(100) NOT NULL,
@@ -89,8 +100,8 @@ CREATE TABLE audit_logs (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 
 -- Triggers for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -101,11 +112,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at'
+    ) THEN
+        CREATE TRIGGER update_users_updated_at
+            BEFORE UPDATE ON users
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 
-CREATE TRIGGER update_providers_updated_at BEFORE UPDATE ON insurance_providers
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_providers_updated_at'
+    ) THEN
+        CREATE TRIGGER update_providers_updated_at
+            BEFORE UPDATE ON insurance_providers
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 
-CREATE TRIGGER update_consents_updated_at BEFORE UPDATE ON user_provider_consents
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_consents_updated_at'
+    ) THEN
+        CREATE TRIGGER update_consents_updated_at
+            BEFORE UPDATE ON user_provider_consents
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
