@@ -1,0 +1,164 @@
+# AI-Powered Insurance Broker Platform - Docker Compose Configuration
+# This file orchestrates all services required for development
+# Version: 1.0.0
+
+services:
+  # PostgreSQL 16 Database with PostGIS extension
+  # Handles all application data with multi-tenant support
+  postgres:
+    image: postgres:16-alpine
+    container_name: insurance-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: insurance_broker
+      POSTGRES_USER: insurance_admin
+      POSTGRES_PASSWORD: secure_password_change_in_production
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.utf8"
+    ports:
+      - "5451:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insurance_admin -d insurance_broker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - insurance_network
+
+  # pgAdmin 4 - Database Management Interface
+  # Access via http://localhost:5050
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: insurance-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password_change_in_production
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - insurance_network
+
+  # Go Backend API Service (Fiber Framework)
+  # RESTful API with JWT authentication
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: insurance-backend
+    restart: unless-stopped
+    environment:
+      # Server Configuration
+      SERVER_PORT: 8096
+      SERVER_ENV: development
+
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: insurance_broker
+      DB_USER: insurance_admin
+      DB_PASSWORD: secure_password_change_in_production
+      DB_SSLMODE: disable
+      DB_MAX_CONNECTIONS: 25
+      DB_MAX_IDLE_CONNECTIONS: 5
+      DB_CONNECTION_LIFETIME: 5m
+
+      # JWT Configuration
+      JWT_SECRET: your_jwt_secret_key_min_32_chars_change_in_production
+      JWT_EXPIRY: 24h
+      JWT_REFRESH_EXPIRY: 168h
+
+      # CORS Configuration
+      CORS_ALLOWED_ORIGINS: http://localhost:7100,http://localhost:4200
+
+      # AI Service Configuration (OpenAI/Anthropic)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # SMS Service (Africa's Talking for Kenya)
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_USERNAME: ${SMS_USERNAME:-}
+
+      # M-Pesa Configuration (Safaricom Kenya)
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-}
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE:-}
+
+      # Rate Limiting
+      RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW: 1m
+
+    ports:
+      - "8096:8096"
+    volumes:
+      # Mount for hot reload during development (disabled - use Air for hot reload instead)
+      # - ./backend:/app
+      - /app/tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - insurance_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Angular 18 Frontend (Standalone Components with Signals)
+  # Progressive Web App with offline support
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: development
+    container_name: insurance-frontend
+    restart: unless-stopped
+    environment:
+      # Angular Configuration
+      NODE_ENV: development
+      API_URL: http://localhost:8096
+
+    ports:
+      - "7100:80"
+    volumes:
+      # Mount source for live reload
+      - ./frontend/src:/app/src
+      - ./frontend/dist/insurance-broker/browser:/usr/share/nginx/html
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - insurance_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    name: insurance_postgres_data
+    driver: local
+  pgadmin_data:
+    name: insurance_pgadmin_data
+    driver: local
+
+# Custom network for service communication
+networks:
+  insurance_network:
+    name: insurance_network
+    driver: bridge

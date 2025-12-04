@@ -1,0 +1,50 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Go build artifacts
+backend/tmp/
+backend/*.exe
+backend/*.exe~
+backend/*.dll
+backend/*.so
+backend/*.dylib
+backend/vendor/
+
+# Go test coverage
+*.out
+coverage.txt
+
+# Angular build artifacts
+frontend/dist/
+frontend/.angular/
+frontend/node_modules/
+frontend/npm-debug.log*
+frontend/yarn-error.log*
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker volumes
+postgres_data/
+pgadmin_data/
+
+# Logs
+*.log
+logs/
+
+# Uploaded files
+uploads/
+temp/
+
+# Database dumps
+*.sql.gz
+*.dump
