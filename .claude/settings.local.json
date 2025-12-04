@@ -19,7 +19,9 @@
       "Bash(curl:*)",
       "Bash(docker exec:*)",
       "Bash(docker-compose restart:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(go get:*)"
     ],
     "deny": [],
     "ask": []
