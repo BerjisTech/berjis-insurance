@@ -1,19 +1,19 @@
 // Authentication domain models and interfaces
 // Defines TypeScript interfaces for authentication-related data structures
 
+import { User } from './user.model';
+
 export interface LoginRequest {
   email: string;
   password: string;
+  deviceId?: string;
+  deviceName?: string;
 }
 
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-  };
+  user: User;
 }
 
 export interface RegisterRequest {
@@ -27,6 +27,7 @@ export interface RegisterResponse {
   message: string;
   userId: string;
   requiresVerification: boolean;
+  debugOtp?: string;
 }
 
 export interface RefreshTokenRequest {
@@ -36,6 +37,7 @@ export interface RefreshTokenRequest {
 export interface RefreshTokenResponse {
   accessToken: string;
   refreshToken: string;
+  user: User;
 }
 
 export interface VerifyOTPRequest {

@@ -1,0 +1,40 @@
+<section class="auth-card">
+  <header class="auth-card__header">
+    <p class="auth-card__eyebrow">Insurance Broker Platform</p>
+    <h1>Sign in to continue</h1>
+    <p class="auth-card__subtitle">Access your personalized insurance workspace.</p>
+  </header>
+
+  <form [formGroup]="loginForm" (ngSubmit)="submit()" novalidate>
+    <div class="form-field">
+      <label for="email">Email address</label>
+      <input id="email" type="email" formControlName="email" placeholder="you@example.com" />
+      <small class="error" *ngIf="loginForm.controls.email.invalid && loginForm.controls.email.touched">
+        Enter a valid email address.
+      </small>
+    </div>
+
+    <div class="form-field">
+      <label for="password">Password</label>
+      <input id="password" type="password" formControlName="password" placeholder="••••••••" />
+      <small class="error" *ngIf="loginForm.controls.password.invalid && loginForm.controls.password.touched">
+        Minimum 8 characters required.
+      </small>
+    </div>
+
+    <div class="auth-card__alerts">
+      <p class="error" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+      <p class="success" *ngIf="successMessage()">{{ successMessage() }}</p>
+    </div>
+
+    <button type="submit" [disabled]="loading()" class="primary-btn">
+      <span *ngIf="!loading()">Sign In</span>
+      <span *ngIf="loading()">Signing you in…</span>
+    </button>
+  </form>
+
+  <div class="auth-card__links">
+    <button type="button" class="link" (click)="navigateToForgotPassword()">Forgot password?</button>
+    <span>Need an account? <button type="button" class="link" (click)="navigateToRegister()">Create one</button></span>
+  </div>
+</section>

@@ -17,7 +17,7 @@ export const authGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
 
   // Check if user is authenticated
-  if (authService.isAuthenticated()) {
+  if (authService.isLoggedIn()) {
     return true;
   }
 
@@ -44,7 +44,7 @@ export const roleGuard = (allowedRoles: string[]): CanActivateFn => {
     const router = inject(Router);
 
     // Check if user is authenticated
-    if (!authService.isAuthenticated()) {
+    if (!authService.isLoggedIn()) {
       router.navigate(['/auth/login'], {
         queryParams: { returnUrl: state.url }
       });

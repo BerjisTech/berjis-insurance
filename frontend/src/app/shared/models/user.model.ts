@@ -6,9 +6,10 @@ export interface User {
   email: string;
   phone?: string;
   role: UserRole;
+  status: UserStatus;
   emailVerified: boolean;
   phoneVerified: boolean;
-  isActive: boolean;
+  isActive?: boolean;
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -77,3 +78,5 @@ export type DocumentType =
   | 'birth_certificate';
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected';
+
+export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification';

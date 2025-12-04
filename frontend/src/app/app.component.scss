@@ -1,0 +1,20 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #eef2ff 0%, #e0f2fe 45%, #ecfeff 100%);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #0f172a;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.app-main {
+  width: 100%;
+  max-width: 520px;
+}

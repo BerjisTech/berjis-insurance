@@ -1,0 +1,32 @@
+<section class="auth-card">
+  <header class="auth-card__header">
+    <p class="auth-card__eyebrow">Security check</p>
+    <h1>Verify your OTP</h1>
+    <p class="auth-card__subtitle">Enter the 6-digit code we sent to your contact.</p>
+  </header>
+
+  <form [formGroup]="otpForm" (ngSubmit)="submit()" novalidate>
+    <div class="form-field">
+      <label for="code">One-Time Password</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" formControlName="code" placeholder="123456" />
+      <small class="error" *ngIf="otpForm.controls.code.invalid && otpForm.controls.code.touched">
+        Enter the 6-digit code.
+      </small>
+    </div>
+
+    <div class="auth-card__alerts">
+      <p class="error" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+      <p class="success" *ngIf="message()">{{ message() }}</p>
+    </div>
+
+    <button class="primary-btn" type="submit" [disabled]="loading()">
+      <span *ngIf="!loading()">Verify code</span>
+      <span *ngIf="loading()">Verifying…</span>
+    </button>
+  </form>
+
+  <div class="auth-card__links">
+    <button class="link" type="button" (click)="resend()">Resend code</button>
+    <a routerLink="/auth/login" class="link">Back to login</a>
+  </div>
+</section>

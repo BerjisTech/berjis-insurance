@@ -5,7 +5,7 @@
 
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, of, BehaviorSubject } from 'rxjs';
+import { Observable, tap, catchError, of } from 'rxjs';
 import { ApiService } from './api.service';
 import { StorageService } from './storage.service';
 import {
@@ -17,7 +17,8 @@ import {
   RefreshTokenResponse,
   VerifyOTPRequest,
   VerifyOTPResponse,
-  PasswordResetRequest
+  PasswordResetRequest,
+  PasswordResetConfirm
 } from '../../shared/models/auth.model';
 import { User } from '../../shared/models/user.model';
 
@@ -70,14 +71,7 @@ export class AuthService {
     return this.api.post<LoginResponse>('/auth/login', credentials)
       .pipe(
         tap(response => {
-          // Store tokens and user data
-          this.storage.setItem(TOKEN_KEY, response.accessToken);
-          this.storage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
-          this.storage.setItem(USER_KEY, response.user);
-
-          // Update signals
-          this.currentUserSignal.set(response.user as any);
-          this.isAuthenticatedSignal.set(true);
+          this.persistSession(response);
         })
       );
   }
@@ -96,6 +90,14 @@ export class AuthService {
    * Clears tokens and redirects to login
    */
   logout(): void {
+    const refreshToken = this.getRefreshToken();
+    if (refreshToken) {
+      this.api.post('/auth/logout', { refreshToken }).subscribe({
+        next: () => undefined,
+        error: () => undefined
+      });
+    }
+
     // Clear storage
     this.storage.removeItem(TOKEN_KEY);
     this.storage.removeItem(REFRESH_TOKEN_KEY);
@@ -135,12 +137,10 @@ export class AuthService {
       return of({} as RefreshTokenResponse);
     }
 
-    return this.api.post<RefreshTokenResponse>('/auth/refresh', { refreshToken })
+    return this.api.post<RefreshTokenResponse>('/auth/refresh', { refreshToken } satisfies RefreshTokenRequest)
       .pipe(
         tap(response => {
-          // Update tokens
-          this.storage.setItem(TOKEN_KEY, response.accessToken);
-          this.storage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+          this.persistSession(response);
         }),
         catchError(error => {
           // If refresh fails, logout user
@@ -165,7 +165,14 @@ export class AuthService {
    * @returns Observable of response
    */
   requestPasswordReset(data: PasswordResetRequest): Observable<any> {
-    return this.api.post('/auth/password-reset', data);
+    return this.api.post('/auth/password-reset/request', data);
+  }
+
+  /**
+   * Confirm password reset with token
+   */
+  confirmPasswordReset(data: PasswordResetConfirm): Observable<any> {
+    return this.api.post('/auth/password-reset/confirm', data);
   }
 
   /**
@@ -185,5 +192,31 @@ export class AuthService {
   hasAnyRole(roles: string[]): boolean {
     const userRole = this.currentUserSignal()?.role;
     return userRole ? roles.includes(userRole) : false;
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  isLoggedIn(): boolean {
+    return this.isAuthenticatedSignal();
+  }
+
+  /**
+   * Persist tokens and user info locally
+   */
+  private persistSession(payload: LoginResponse | RefreshTokenResponse): void {
+    if (!payload.accessToken || !payload.refreshToken) {
+      return;
+    }
+
+    this.storage.setItem(TOKEN_KEY, payload.accessToken);
+    this.storage.setItem(REFRESH_TOKEN_KEY, payload.refreshToken);
+
+    if (payload.user) {
+      this.storage.setItem(USER_KEY, payload.user);
+      this.currentUserSignal.set(payload.user);
+    }
+
+    this.isAuthenticatedSignal.set(true);
   }
 }

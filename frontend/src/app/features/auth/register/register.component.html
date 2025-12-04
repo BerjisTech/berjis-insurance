@@ -1,0 +1,59 @@
+<section class="auth-card">
+  <header class="auth-card__header">
+    <p class="auth-card__eyebrow">Create account</p>
+    <h1>Join the smart insurance workspace</h1>
+    <p class="auth-card__subtitle">One profile unlocks quotes, claims and AI recommendations.</p>
+  </header>
+
+  <form [formGroup]="registerForm" (ngSubmit)="submit()" novalidate>
+    <div class="form-grid">
+      <div class="form-field full-width">
+        <label for="fullName">Full name</label>
+        <input id="fullName" type="text" formControlName="fullName" placeholder="Jane Doe" />
+        <small class="error" *ngIf="registerForm.controls.fullName.invalid && registerForm.controls.fullName.touched">
+          Tell us what to call you.
+        </small>
+      </div>
+
+      <div class="form-field full-width">
+        <label for="email">Email</label>
+        <input id="email" type="email" formControlName="email" placeholder="you@example.com" />
+        <small class="error" *ngIf="registerForm.controls.email.invalid && registerForm.controls.email.touched">
+          Valid email required.
+        </small>
+      </div>
+
+      <div class="form-field full-width">
+        <label for="phone">Phone (optional)</label>
+        <input id="phone" type="tel" formControlName="phone" placeholder="+254712345678" />
+        <small class="hint">We will send OTPs to this number.</small>
+      </div>
+
+      <div class="form-field">
+        <label for="password">Password</label>
+        <input id="password" type="password" formControlName="password" placeholder="Create a strong password" />
+      </div>
+
+      <div class="form-field">
+        <label for="confirmPassword">Confirm password</label>
+        <input id="confirmPassword" type="password" formControlName="confirmPassword" placeholder="Repeat password" />
+      </div>
+    </div>
+
+    <div class="auth-card__alerts">
+      <p class="error" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+      <p class="success" *ngIf="infoMessage()">{{ infoMessage() }}</p>
+      <p class="hint" *ngIf="debugOtp()">{{ debugOtp() }}</p>
+    </div>
+
+    <button type="submit" class="primary-btn" [disabled]="loading()">
+      <span *ngIf="!loading()">Create account</span>
+      <span *ngIf="loading()">Creating account…</span>
+    </button>
+  </form>
+
+  <p class="auth-card__links">
+    Already a member?
+    <button type="button" class="link" (click)="navigateToLogin()">Sign in</button>
+  </p>
+</section>
