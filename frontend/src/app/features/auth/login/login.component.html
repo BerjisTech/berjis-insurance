@@ -8,7 +8,15 @@
   <form [formGroup]="loginForm" (ngSubmit)="submit()" novalidate>
     <div class="form-field">
       <label for="email">Email address</label>
-      <input id="email" type="email" formControlName="email" placeholder="you@example.com" />
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        placeholder="you@example.com"
+        autocomplete="email"
+        required
+        aria-required="true"
+      />
       <small class="error" *ngIf="loginForm.controls.email.invalid && loginForm.controls.email.touched">
         Enter a valid email address.
       </small>
@@ -16,7 +24,15 @@
 
     <div class="form-field">
       <label for="password">Password</label>
-      <input id="password" type="password" formControlName="password" placeholder="••••••••" />
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        placeholder="••••••••"
+        autocomplete="current-password"
+        required
+        aria-required="true"
+      />
       <small class="error" *ngIf="loginForm.controls.password.invalid && loginForm.controls.password.touched">
         Minimum 8 characters required.
       </small>

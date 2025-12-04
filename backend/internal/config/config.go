@@ -16,32 +16,33 @@ import (
 // Config holds all application configuration
 // Fields are populated from environment variables
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	AI       AIConfig
-	SMS      SMSConfig
-	MPesa    MPesaConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	JWT       JWTConfig
+	AI        AIConfig
+	Email     EmailConfig
+	SMS       SMSConfig
+	MPesa     MPesaConfig
 	RateLimit RateLimitConfig
 }
 
 // ServerConfig contains HTTP server settings
 type ServerConfig struct {
-	Port              string   // Server port (default: 8096)
-	Env               string   // Environment: development|staging|production
+	Port               string   // Server port (default: 8096)
+	Env                string   // Environment: development|staging|production
 	CORSAllowedOrigins []string // Allowed CORS origins
 }
 
 // DatabaseConfig contains PostgreSQL connection settings
 type DatabaseConfig struct {
-	Host              string        // Database host
-	Port              string        // Database port
-	Name              string        // Database name
-	User              string        // Database user
-	Password          string        // Database password
-	SSLMode           string        // SSL mode: disable|require|verify-full
-	MaxConnections    int           // Maximum open connections
-	MaxIdleConnections int          // Maximum idle connections
+	Host               string        // Database host
+	Port               string        // Database port
+	Name               string        // Database name
+	User               string        // Database user
+	Password           string        // Database password
+	SSLMode            string        // SSL mode: disable|require|verify-full
+	MaxConnections     int           // Maximum open connections
+	MaxIdleConnections int           // Maximum idle connections
 	ConnectionLifetime time.Duration // Maximum connection lifetime
 }
 
@@ -54,14 +55,15 @@ type JWTConfig struct {
 
 // AIConfig contains AI service API keys
 type AIConfig struct {
-	OpenAIKey     string // OpenAI API key for GPT models
-	AnthropicKey  string // Anthropic API key for Claude models
+	OpenAIKey    string // OpenAI API key for GPT models
+	AnthropicKey string // Anthropic API key for Claude models
 }
 
 // SMSConfig contains SMS service configuration (Africa's Talking)
 type SMSConfig struct {
 	APIKey   string // Africa's Talking API key
 	Username string // Africa's Talking username
+	SenderID string // Sender ID or short code
 }
 
 // MPesaConfig contains M-Pesa payment gateway configuration
@@ -76,6 +78,14 @@ type MPesaConfig struct {
 type RateLimitConfig struct {
 	Max    int           // Maximum requests per window
 	Window time.Duration // Time window for rate limiting
+}
+
+// EmailConfig contains transactional email provider settings
+type EmailConfig struct {
+	Provider    string // e.g., sendgrid
+	APIKey      string // provider API key
+	FromAddress string // default from email
+	FromName    string // display name
 }
 
 // Load reads environment variables and returns populated Config
@@ -129,8 +139,8 @@ func Load() *Config {
 	// Build configuration struct
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8096"),
-			Env:  getEnv("SERVER_ENV", "development"),
+			Port:               getEnv("SERVER_PORT", "8096"),
+			Env:                getEnv("SERVER_ENV", "development"),
 			CORSAllowedOrigins: parseCORSOrigins(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:7100")),
 		},
 		Database: DatabaseConfig{
@@ -153,9 +163,16 @@ func Load() *Config {
 			OpenAIKey:    getEnv("OPENAI_API_KEY", ""),
 			AnthropicKey: getEnv("ANTHROPIC_API_KEY", ""),
 		},
+		Email: EmailConfig{
+			Provider:    getEnv("EMAIL_PROVIDER", "sendgrid"),
+			APIKey:      getEnv("EMAIL_API_KEY", ""),
+			FromAddress: getEnv("EMAIL_FROM_ADDRESS", "no-reply@insurance.local"),
+			FromName:    getEnv("EMAIL_FROM_NAME", "Insurance Broker AI"),
+		},
 		SMS: SMSConfig{
 			APIKey:   getEnv("SMS_API_KEY", ""),
 			Username: getEnv("SMS_USERNAME", ""),
+			SenderID: getEnv("SMS_SENDER_ID", "InsuranceAI"),
 		},
 		MPesa: MPesaConfig{
 			ConsumerKey:    getEnv("MPESA_CONSUMER_KEY", ""),
@@ -186,6 +203,10 @@ func (c *Config) validate() {
 	// Critical: JWT secret must be at least 32 characters
 	if len(c.JWT.Secret) < 32 {
 		log.Fatal("JWT_SECRET must be at least 32 characters long")
+	}
+
+	if c.Email.APIKey == "" {
+		log.Println("WARNING: EMAIL_API_KEY not configured (OTP emails will be logged only)")
 	}
 
 	// Warning: AI API keys (optional for development)

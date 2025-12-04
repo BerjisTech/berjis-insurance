@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'auth/login', pathMatch: 'full' },
@@ -26,6 +27,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/auth/password-reset-confirm/password-reset-confirm.component').then(m => m.PasswordResetConfirmComponent)
       }
     ]
+  },
+  {
+    path: 'dashboard',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   { path: '**', redirectTo: 'auth/login' }
 ];

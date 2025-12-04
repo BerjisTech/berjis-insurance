@@ -66,6 +66,12 @@ type VerifyOTPRequest struct {
 	Code    string `json:"code"`
 }
 
+// ResendOTPRequest payload
+type ResendOTPRequest struct {
+	UserID  string `json:"userId"`
+	Purpose string `json:"purpose"`
+}
+
 // RefreshRequest payload
 type RefreshRequest struct {
 	RefreshToken string `json:"refreshToken"`
@@ -211,6 +217,29 @@ func (h *AuthHandler) VerifyOTP(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Verification successful",
+	})
+}
+
+// ResendOTP handles OTP regeneration requests
+func (h *AuthHandler) ResendOTP(c *fiber.Ctx) error {
+	var req ResendOTPRequest
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	if req.UserID == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "userId is required")
+	}
+
+	if err := h.service.ResendOTP(c.UserContext(), services.ResendOTPInput{
+		UserID:  req.UserID,
+		Purpose: req.Purpose,
+	}); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "OTP sent successfully",
 	})
 }
 

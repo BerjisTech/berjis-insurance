@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/insurance-broker/backend/internal/auth"
+	"github.com/insurance-broker/backend/internal/clients"
 	"github.com/insurance-broker/backend/internal/config"
 	"github.com/insurance-broker/backend/internal/database"
 	"github.com/insurance-broker/backend/internal/handlers"
@@ -42,7 +43,11 @@ func main() {
 	authRepo := repository.NewAuthRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	otpService := auth.NewOTPService(authRepo)
-	authService := services.NewAuthService(userRepo, authRepo, jwtService, passwordService, otpService, services.AuthServiceOptions{
+	emailClient := clients.NewEmailClient(&cfg.Email)
+	smsClient := clients.NewSMSClient(&cfg.SMS)
+	notificationService := services.NewNotificationService(emailClient, smsClient)
+
+	authService := services.NewAuthService(userRepo, authRepo, jwtService, passwordService, otpService, notificationService, services.AuthServiceOptions{
 		Env:        cfg.Server.Env,
 		AccessTTL:  cfg.JWT.Expiry,
 		RefreshTTL: cfg.JWT.RefreshExpiry,
@@ -140,6 +145,7 @@ func main() {
 	auth.Post("/login", authHandler.Login)
 	auth.Post("/refresh", authHandler.RefreshToken)
 	auth.Post("/verify-otp", authHandler.VerifyOTP)
+	auth.Post("/resend-otp", authHandler.ResendOTP)
 	auth.Post("/password-reset/request", authHandler.RequestPasswordReset)
 	auth.Post("/password-reset/confirm", authHandler.ResetPassword)
 	auth.Post("/logout", middleware.Protected(&cfg.JWT), authHandler.Logout)

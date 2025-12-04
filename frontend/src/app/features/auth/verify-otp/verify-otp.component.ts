@@ -18,8 +18,9 @@ export class VerifyOtpComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
+  private readonly defaultPurpose: VerifyOTPRequest['purpose'] = 'email_verification';
   private pendingUserId = this.route.snapshot.queryParamMap.get('userId') ?? '';
-  private purpose = (this.route.snapshot.queryParamMap.get('purpose') ?? 'phone_verification') as VerifyOTPRequest['purpose'];
+  private purpose = (this.route.snapshot.queryParamMap.get('purpose') ?? this.defaultPurpose) as VerifyOTPRequest['purpose'];
 
   otpForm = this.fb.nonNullable.group({
     code: ['', [Validators.required, Validators.pattern(/^[0-9]{6}$/)]]
@@ -64,7 +65,27 @@ export class VerifyOtpComponent {
   }
 
   resend(): void {
-    // Future enhancement: call resend endpoint
-    this.errorMessage.set('Resend not yet available. Please check your inbox.');
+    if (!this.pendingUserId) {
+      this.errorMessage.set('Missing user reference.');
+      return;
+    }
+
+    this.loading.set(true);
+    this.errorMessage.set('');
+    this.message.set('');
+
+    this.authService.resendOTP({
+      userId: this.pendingUserId,
+      purpose: this.purpose
+    }).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.message.set('A new code has been sent.');
+      },
+      error: (err: Error) => {
+        this.loading.set(false);
+        this.errorMessage.set(err.message ?? 'Unable to resend code.');
+      }
+    });
   }
 }

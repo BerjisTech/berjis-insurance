@@ -1,0 +1,16 @@
+<section class="dashboard">
+  <header>
+    <p class="eyebrow">AI Insurance Broker</p>
+    <h1>Welcome back</h1>
+    <p class="subtitle">This is a placeholder dashboard. Hook future widgets here.</p>
+  </header>
+
+  <article class="card" *ngIf="user$() as user">
+    <h2>Profile snapshot</h2>
+    <p>ID: {{ user.id }}</p>
+    <p>Status: {{ user.status }}</p>
+    <p>Email verified: {{ user.emailVerified ? 'Yes' : 'No' }}</p>
+  </article>
+
+  <a routerLink="/auth/login" class="link">Sign out to switch accounts</a>
+</section>

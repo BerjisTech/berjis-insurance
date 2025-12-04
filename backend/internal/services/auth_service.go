@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -27,6 +28,36 @@ var (
 	ErrInvalidRefreshToken  = errors.New("invalid refresh token")
 )
 
+// UserStore defines persistence behavior needed by AuthService
+type UserStore interface {
+	CreateUser(ctx context.Context, user *models.User) (string, error)
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
+	GetByPhone(ctx context.Context, phone string) (*models.User, error)
+	GetByID(ctx context.Context, id string) (*models.User, error)
+	UpdateVerification(ctx context.Context, id string, emailVerified, phoneVerified bool, status string) error
+	UpdateLastLogin(ctx context.Context, id string, ts time.Time) error
+	IncrementFailedAttempts(ctx context.Context, id string, lockUntil sql.NullTime) error
+	UpdatePassword(ctx context.Context, id, newHash string) error
+}
+
+// AuthDataStore defines refresh token/session persistence
+type AuthDataStore interface {
+	StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error)
+	GetRefreshTokenByHash(ctx context.Context, hash string) (*models.RefreshToken, error)
+	UpdateSessionActivityByRefresh(ctx context.Context, refreshTokenID string, lastActive time.Time) error
+	RevokeRefreshToken(ctx context.Context, id, reason string) error
+	CreatePasswordResetToken(ctx context.Context, token *models.PasswordResetToken) (string, error)
+	GetPasswordResetToken(ctx context.Context, hash string) (*models.PasswordResetToken, error)
+	MarkPasswordResetUsed(ctx context.Context, id string) error
+	CreateSession(ctx context.Context, session *models.UserSession) (string, error)
+}
+
+// OTPManager abstracts OTP generation/verification
+type OTPManager interface {
+	GenerateAndStore(ctx context.Context, userID sql.NullString, identifier, purpose, channel string) (string, error)
+	Verify(ctx context.Context, identifier, purpose, code string) error
+}
+
 // AuthServiceOptions configures AuthService runtime behaviour
 type AuthServiceOptions struct {
 	Env        string
@@ -36,11 +67,12 @@ type AuthServiceOptions struct {
 
 // AuthService provides authentication workflows
 type AuthService struct {
-	users      *repository.UserRepository
-	authRepo   *repository.AuthRepository
+	users      UserStore
+	authRepo   AuthDataStore
 	jwt        *auth.JWTService
 	password   *auth.PasswordService
-	otp        *auth.OTPService
+	otp        OTPManager
+	notifier   NotificationSender
 	env        string
 	accessTTL  time.Duration
 	refreshTTL time.Duration
@@ -48,13 +80,14 @@ type AuthService struct {
 }
 
 // NewAuthService constructs a new AuthService
-func NewAuthService(users *repository.UserRepository, authRepo *repository.AuthRepository, jwtService *auth.JWTService, passwordService *auth.PasswordService, otpService *auth.OTPService, opts AuthServiceOptions) *AuthService {
+func NewAuthService(users UserStore, authRepo AuthDataStore, jwtService *auth.JWTService, passwordService *auth.PasswordService, otpService OTPManager, notifier NotificationSender, opts AuthServiceOptions) *AuthService {
 	service := &AuthService{
 		users:      users,
 		authRepo:   authRepo,
 		jwt:        jwtService,
 		password:   passwordService,
 		otp:        otpService,
+		notifier:   notifier,
 		env:        opts.Env,
 		accessTTL:  opts.AccessTTL,
 		refreshTTL: opts.RefreshTTL,
@@ -105,6 +138,12 @@ type VerifyOTPInput struct {
 	UserID  string
 	Purpose string
 	Code    string
+}
+
+// ResendOTPInput captures resend payload
+type ResendOTPInput struct {
+	UserID  string
+	Purpose string
 }
 
 // RefreshInput captures refresh token requests
@@ -207,19 +246,16 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*Regis
 		return nil, err
 	}
 
-	purpose := models.OTPPurposeEmailVerification
-	channel := "email"
-	identifier := email
-	if normalizedPhone != "" {
-		purpose = models.OTPPurposePhoneVerification
-		channel = "sms"
-		identifier = normalizedPhone
+	purpose, channel, identifier, err := s.resolveOTPTarget(user, determineOTPPurpose(normalizedPhone))
+	if err != nil {
+		return nil, err
 	}
 
 	otpCode, err := s.otp.GenerateAndStore(ctx, sql.NullString{Valid: true, String: userID}, identifier, purpose, channel)
 	if err != nil {
 		return nil, err
 	}
+	s.sendOTPNotification(ctx, channel, identifier, otpCode)
 
 	result := &RegisterResult{UserID: userID, RequiresVerification: true}
 	if s.env == "development" {
@@ -275,6 +311,27 @@ func (s *AuthService) VerifyOTP(ctx context.Context, input VerifyOTPInput) error
 		return err
 	}
 
+	return nil
+}
+
+// ResendOTP regenerates and sends OTP for verification
+func (s *AuthService) ResendOTP(ctx context.Context, input ResendOTPInput) error {
+	user, err := s.users.GetByID(ctx, input.UserID)
+	if err != nil {
+		return err
+	}
+
+	purpose, channel, identifier, err := s.resolveOTPTarget(user, input.Purpose)
+	if err != nil {
+		return err
+	}
+
+	code, err := s.otp.GenerateAndStore(ctx, sql.NullString{Valid: true, String: user.ID}, identifier, purpose, channel)
+	if err != nil {
+		return err
+	}
+
+	s.sendOTPNotification(ctx, channel, identifier, code)
 	return nil
 }
 
@@ -453,6 +510,8 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, input PasswordRe
 		return nil, err
 	}
 
+	s.sendPasswordResetNotification(ctx, user.Email, rawToken)
+
 	result := &PasswordResetRequestResult{}
 	if s.env == "development" {
 		result.DevelopmentToken = rawToken
@@ -512,4 +571,58 @@ func randomString(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+func (s *AuthService) resolveOTPTarget(user *models.User, requestedPurpose string) (string, string, string, error) {
+	purpose := requestedPurpose
+	channel := "email"
+	identifier := user.Email
+
+	switch requestedPurpose {
+	case models.OTPPurposePhoneVerification:
+		if !user.Phone.Valid {
+			return "", "", "", errors.New("phone number missing for OTP")
+		}
+		channel = "sms"
+		identifier = user.Phone.String
+	case models.OTPPurposeEmailVerification, "":
+		purpose = models.OTPPurposeEmailVerification
+	default:
+		if user.Phone.Valid {
+			purpose = models.OTPPurposePhoneVerification
+			channel = "sms"
+			identifier = user.Phone.String
+		} else {
+			purpose = models.OTPPurposeEmailVerification
+			channel = "email"
+			identifier = user.Email
+		}
+	}
+
+	return purpose, channel, identifier, nil
+}
+
+func determineOTPPurpose(normalizedPhone string) string {
+	if normalizedPhone != "" {
+		return models.OTPPurposePhoneVerification
+	}
+	return models.OTPPurposeEmailVerification
+}
+
+func (s *AuthService) sendOTPNotification(ctx context.Context, channel, identifier, code string) {
+	if s.notifier == nil {
+		return
+	}
+	if err := s.notifier.SendOTP(ctx, channel, identifier, code); err != nil {
+		log.Printf("failed to dispatch OTP notification: %v", err)
+	}
+}
+
+func (s *AuthService) sendPasswordResetNotification(ctx context.Context, email, token string) {
+	if s.notifier == nil {
+		return
+	}
+	if err := s.notifier.SendPasswordReset(ctx, email, token); err != nil {
+		log.Printf("failed to send password reset email: %v", err)
+	}
 }

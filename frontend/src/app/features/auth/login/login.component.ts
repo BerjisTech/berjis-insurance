@@ -45,6 +45,7 @@ export class LoginComponent {
       next: () => {
         this.successMessage.set('Welcome back! You are now signed in.');
         this.loading.set(false);
+        this.router.navigate(['/dashboard']);
       },
       error: (err: Error) => {
         this.errorMessage.set(err.message ?? 'Unable to login. Please try again.');

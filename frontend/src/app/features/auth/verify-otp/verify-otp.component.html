@@ -8,7 +8,16 @@
   <form [formGroup]="otpForm" (ngSubmit)="submit()" novalidate>
     <div class="form-field">
       <label for="code">One-Time Password</label>
-      <input id="code" type="text" inputmode="numeric" maxlength="6" formControlName="code" placeholder="123456" />
+      <input
+        id="code"
+        type="text"
+        inputmode="numeric"
+        maxlength="6"
+        formControlName="code"
+        placeholder="123456"
+        required
+        aria-required="true"
+      />
       <small class="error" *ngIf="otpForm.controls.code.invalid && otpForm.controls.code.touched">
         Enter the 6-digit code.
       </small>

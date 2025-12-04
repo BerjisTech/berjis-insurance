@@ -51,6 +51,15 @@ export interface VerifyOTPResponse {
   message: string;
 }
 
+export interface ResendOTPRequest {
+  userId: string;
+  purpose?: OTPPurpose;
+}
+
+export interface ResendOTPResponse {
+  message: string;
+}
+
 export interface PasswordResetRequest {
   email: string;
 }
