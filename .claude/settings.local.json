@@ -18,7 +18,8 @@
       "Bash(docker logs:*)",
       "Bash(curl:*)",
       "Bash(docker exec:*)",
-      "Bash(docker-compose restart:*)"
+      "Bash(docker-compose restart:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
