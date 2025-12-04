@@ -1,11 +1,11 @@
 # Insurance Broker Platform - Backend Dockerfile
 # Multi-stage build for optimized production image
-# Go 1.22+ with Fiber framework
+# Go 1.25+ with Fiber framework
 
 # =============================================================================
 # Stage 1: Builder
 # =============================================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git gcc musl-dev
