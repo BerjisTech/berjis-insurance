@@ -29,6 +29,9 @@ RUN npm run build -- --configuration=production
 # =============================================================================
 FROM nginx:1.27-alpine
 
+# Install runtime deps (wget for healthcheck)
+RUN apk add --no-cache wget
+
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
