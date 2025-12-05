@@ -12,5 +12,5 @@
     <p>Email verified: {{ user.emailVerified ? 'Yes' : 'No' }}</p>
   </article>
 
-  <a routerLink="/auth/login" class="link">Sign out to switch accounts</a>
+  <button type="button" class="link" (click)="logout()">Sign out to switch accounts</button>
 </section>

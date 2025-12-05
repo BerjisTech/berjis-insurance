@@ -14,4 +14,8 @@ export class DashboardComponent {
   private readonly authService = inject(AuthService);
 
   user$ = this.authService.currentUser;
+
+  logout(): void {
+    this.authService.logout();
+  }
 }
