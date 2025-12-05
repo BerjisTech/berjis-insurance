@@ -10,11 +10,13 @@
       <label for="code">One-Time Password</label>
       <input
         id="code"
-        type="text"
+        type="tel"
         inputmode="numeric"
         maxlength="6"
         formControlName="code"
         placeholder="123456"
+        autocomplete="one-time-code"
+        pattern="[0-9]{6}"
         required
         aria-required="true"
       />
@@ -30,12 +32,21 @@
 
     <button class="primary-btn" type="submit" [disabled]="loading()">
       <span *ngIf="!loading()">Verify code</span>
-      <span *ngIf="loading()">Verifying…</span>
+      <span *ngIf="loading()">Verifying...</span>
     </button>
   </form>
 
   <div class="auth-card__links">
-    <button class="link" type="button" (click)="resend()">Resend code</button>
+    <button
+      class="link"
+      type="button"
+      (click)="resend()"
+      [disabled]="loading() || cooldown() > 0"
+      aria-live="polite"
+    >
+      <ng-container *ngIf="cooldown() === 0; else cooldownTimer">Resend code</ng-container>
+    </button>
+    <ng-template #cooldownTimer>Resend in {{ cooldown() }}s</ng-template>
     <a routerLink="/auth/login" class="link">Back to login</a>
   </div>
 </section>

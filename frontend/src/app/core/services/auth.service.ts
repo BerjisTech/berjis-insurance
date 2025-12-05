@@ -19,7 +19,8 @@ import {
   VerifyOTPResponse,
   PasswordResetRequest,
   PasswordResetConfirm,
-  ResendOTPRequest
+  ResendOTPRequest,
+  ResendOTPResponse
 } from '../../shared/models/auth.model';
 import { User } from '../../shared/models/user.model';
 
@@ -163,8 +164,8 @@ export class AuthService {
   /**
    * Resend OTP code
    */
-  resendOTP(data: ResendOTPRequest): Observable<any> {
-    return this.api.post('/auth/resend-otp', data);
+  resendOTP(data: ResendOTPRequest): Observable<ResendOTPResponse> {
+    return this.api.post<ResendOTPResponse>('/auth/resend-otp', data);
   }
 
   /**

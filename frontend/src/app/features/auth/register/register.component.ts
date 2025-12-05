@@ -4,6 +4,11 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { RegisterRequest } from '../../../shared/models/auth.model';
+import {
+  PASSWORD_COMPLEXITY_PATTERN,
+  PASSWORD_REQUIREMENTS,
+  PHONE_E164_PATTERN
+} from '../../../shared/utils/form-validators';
 
 @Component({
   selector: 'app-register',
@@ -17,11 +22,13 @@ export class RegisterComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
+  readonly passwordRequirements = PASSWORD_REQUIREMENTS;
+
   registerForm = this.fb.nonNullable.group({
     fullName: ['', [Validators.required, Validators.minLength(3)]],
     email: ['', [Validators.required, Validators.email]],
-    phone: [''],
-    password: ['', [Validators.required, Validators.minLength(8)]],
+    phone: ['', [Validators.pattern(PHONE_E164_PATTERN)]],
+    password: ['', [Validators.required, Validators.pattern(PASSWORD_COMPLEXITY_PATTERN)]],
     confirmPassword: ['', [Validators.required]]
   });
 
@@ -41,11 +48,14 @@ export class RegisterComponent {
       return;
     }
 
+    const phone = this.registerForm.value.phone?.trim();
+    const fullName = this.registerForm.value.fullName?.trim();
+
     const payload: RegisterRequest = {
       email: this.registerForm.value.email!,
       password: this.registerForm.value.password!,
-      phone: this.registerForm.value.phone || undefined,
-      fullName: this.registerForm.value.fullName || undefined
+      phone: phone || undefined,
+      fullName: fullName || undefined
     };
 
     this.loading.set(true);

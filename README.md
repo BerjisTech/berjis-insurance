@@ -210,6 +210,14 @@ ANTHROPIC_API_KEY=<your_key>
 
 # SMS (Africa's Talking)
 SMS_API_KEY=<your_key>
+SMS_USERNAME=<your_username>
+SMS_SENDER_ID=<sender_id>
+
+# Email (SendGrid)
+EMAIL_PROVIDER=sendgrid
+EMAIL_API_KEY=<your_key>
+EMAIL_FROM_ADDRESS=no-reply@insurance.local
+EMAIL_FROM_NAME="Insurance Broker AI"
 
 # M-Pesa
 MPESA_CONSUMER_KEY=<your_key>

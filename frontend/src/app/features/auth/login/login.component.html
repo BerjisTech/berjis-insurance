@@ -28,7 +28,7 @@
         id="password"
         type="password"
         formControlName="password"
-        placeholder="••••••••"
+        placeholder="********"
         autocomplete="current-password"
         required
         aria-required="true"
@@ -45,7 +45,7 @@
 
     <button type="submit" [disabled]="loading()" class="primary-btn">
       <span *ngIf="!loading()">Sign In</span>
-      <span *ngIf="loading()">Signing you in…</span>
+      <span *ngIf="loading()">Signing you in...</span>
     </button>
   </form>
 

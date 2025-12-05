@@ -3,6 +3,10 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import {
+  PASSWORD_COMPLEXITY_PATTERN,
+  PASSWORD_REQUIREMENTS
+} from '../../../shared/utils/form-validators';
 
 @Component({
   selector: 'app-password-reset-confirm',
@@ -16,9 +20,11 @@ export class PasswordResetConfirmComponent {
   private readonly authService = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
+  readonly passwordRequirements = PASSWORD_REQUIREMENTS;
+
   confirmForm = this.fb.nonNullable.group({
     token: ['', Validators.required],
-    newPassword: ['', [Validators.required, Validators.minLength(8)]],
+    newPassword: ['', [Validators.required, Validators.pattern(PASSWORD_COMPLEXITY_PATTERN)]],
     confirmPassword: ['', Validators.required]
   });
 

@@ -46,8 +46,15 @@
           placeholder="+254712345678"
           inputmode="tel"
           autocomplete="tel"
+          pattern="\+?[0-9]{10,15}"
         />
         <small class="hint">We will send OTPs to this number.</small>
+        <small
+          class="error"
+          *ngIf="registerForm.controls.phone.hasError('pattern') && registerForm.controls.phone.touched && registerForm.controls.phone.value"
+        >
+          Enter a valid international phone number (e.g. +254712345678).
+        </small>
       </div>
 
       <div class="form-field">
@@ -60,6 +67,9 @@
           autocomplete="new-password"
           required
         />
+        <small class="error" *ngIf="registerForm.controls.password.hasError('pattern') && registerForm.controls.password.touched">
+          {{ passwordRequirements }}
+        </small>
       </div>
 
       <div class="form-field">
@@ -72,6 +82,9 @@
           autocomplete="new-password"
           required
         />
+        <small class="error" *ngIf="registerForm.controls.confirmPassword.touched && registerForm.value.confirmPassword && registerForm.value.password !== registerForm.value.confirmPassword">
+          Passwords must match.
+        </small>
       </div>
     </div>
 
@@ -83,7 +96,7 @@
 
     <button type="submit" class="primary-btn" [disabled]="loading()">
       <span *ngIf="!loading()">Create account</span>
-      <span *ngIf="loading()">Creating account…</span>
+      <span *ngIf="loading()">Creating account...</span>
     </button>
   </form>
 

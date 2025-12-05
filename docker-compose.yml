@@ -87,6 +87,13 @@ services:
       # SMS Service (Africa's Talking for Kenya)
       SMS_API_KEY: ${SMS_API_KEY:-}
       SMS_USERNAME: ${SMS_USERNAME:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-InsuranceAI}
+
+      # Email Service (SendGrid)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-sendgrid}
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-no-reply@insurance.local}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Insurance Broker AI}
 
       # M-Pesa Configuration (Safaricom Kenya)
       MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
