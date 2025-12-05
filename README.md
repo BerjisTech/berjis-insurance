@@ -213,6 +213,10 @@ SMS_API_KEY=<your_key>
 SMS_USERNAME=<your_username>
 SMS_SENDER_ID=<sender_id>
 
+# Frontend API target
+# (Change to your public hostname + TLS once deployed)
+FRONTEND_API_URL=http://localhost:8096/api/v1
+
 # Email (SendGrid)
 EMAIL_PROVIDER=sendgrid
 EMAIL_API_KEY=<your_key>
