@@ -18,4 +18,10 @@ test.describe('Authentication shell', () => {
     await expect(page).toHaveURL(/auth\/register/);
     await expect(page.getByRole('heading', { name: /join the smart insurance workspace/i })).toBeVisible();
   });
+
+  test('redirects unauthenticated dashboard access back to login with returnUrl', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page).toHaveURL(/auth\/login\?returnUrl=%2Fdashboard/);
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
+  });
 });

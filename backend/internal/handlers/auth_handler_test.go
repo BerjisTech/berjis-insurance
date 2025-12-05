@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -46,9 +49,80 @@ func TestResendOTPRoute(t *testing.T) {
 	}
 }
 
+func TestAuthRoutes_RegisterVerifyLoginFlow(t *testing.T) {
+	h := newHandlerTestHarness(t)
+	app := fiber.New()
+	app.Post("/auth/register", h.handler.Register)
+	app.Post("/auth/verify-otp", h.handler.VerifyOTP)
+	app.Post("/auth/login", h.handler.Login)
+
+	registerReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(`{
+		"email":"integration@test.com",
+		"password":"Password1"
+	}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+
+	registerResp, err := app.Test(registerReq)
+	if err != nil {
+		t.Fatalf("register request failed: %v", err)
+	}
+	defer registerResp.Body.Close()
+	if registerResp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 register, got %d", registerResp.StatusCode)
+	}
+	var registerBody struct {
+		UserID string `json:"userId"`
+	}
+	decodeBody(t, registerResp.Body, &registerBody)
+	if registerBody.UserID == "" {
+		t.Fatalf("expected userId in response")
+	}
+
+	verifyPayload := fmt.Sprintf(`{"userId":"%s","purpose":"email_verification","code":"%s"}`, registerBody.UserID, h.otp.currentCode())
+	verifyReq := httptest.NewRequest(http.MethodPost, "/auth/verify-otp", bytes.NewBufferString(verifyPayload))
+	verifyReq.Header.Set("Content-Type", "application/json")
+
+	verifyResp, err := app.Test(verifyReq)
+	if err != nil {
+		t.Fatalf("verify request failed: %v", err)
+	}
+	defer verifyResp.Body.Close()
+	if verifyResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 verify, got %d", verifyResp.StatusCode)
+	}
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{
+		"email":"integration@test.com",
+		"password":"Password1"
+	}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+
+	loginResp, err := app.Test(loginReq)
+	if err != nil {
+		t.Fatalf("login request failed: %v", err)
+	}
+	defer loginResp.Body.Close()
+	if loginResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 login, got %d", loginResp.StatusCode)
+	}
+	var loginBody TokenResponse
+	decodeBody(t, loginResp.Body, &loginBody)
+	if loginBody.AccessToken == "" || loginBody.RefreshToken == "" {
+		t.Fatalf("expected tokens in login response")
+	}
+}
+
+func decodeBody(t *testing.T, reader io.Reader, target any) {
+	t.Helper()
+	if err := json.NewDecoder(reader).Decode(target); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+}
+
 type handlerTestHarness struct {
 	service *services.AuthService
 	handler *AuthHandler
+	otp     *handlerOTP
 }
 
 func newHandlerTestHarness(t *testing.T) *handlerTestHarness {
@@ -57,7 +131,7 @@ func newHandlerTestHarness(t *testing.T) *handlerTestHarness {
 	users := &handlerUserStore{users: make(map[string]*models.User)}
 	authRepo := &handlerAuthRepo{}
 	notifier := &handlerNotifier{}
-	otp := &handlerOTP{}
+	otp := newHandlerOTP()
 	jwtService, err := auth.NewJWTService(strings.Repeat("x", 64), time.Minute*15, time.Hour*24)
 	if err != nil {
 		t.Fatalf("jwt init failed: %v", err)
@@ -72,6 +146,7 @@ func newHandlerTestHarness(t *testing.T) *handlerTestHarness {
 	return &handlerTestHarness{
 		service: service,
 		handler: NewAuthHandler(service),
+		otp:     otp,
 	}
 }
 
@@ -154,12 +229,26 @@ func (h *handlerAuthRepo) CreateSession(ctx context.Context, session *models.Use
 
 // OTP + notifier fakes
 
-type handlerOTP struct{}
+type handlerOTP struct {
+	code string
+}
+
+func newHandlerOTP() *handlerOTP {
+	return &handlerOTP{code: "123456"}
+}
 
 func (h *handlerOTP) GenerateAndStore(ctx context.Context, userID sql.NullString, identifier, purpose, channel string) (string, error) {
-	return "123456", nil
+	return h.code, nil
 }
-func (h *handlerOTP) Verify(ctx context.Context, identifier, purpose, code string) error { return nil }
+func (h *handlerOTP) Verify(ctx context.Context, identifier, purpose, code string) error {
+	if code != h.code {
+		return errors.New("invalid otp")
+	}
+	return nil
+}
+func (h *handlerOTP) currentCode() string {
+	return h.code
+}
 
 type handlerNotifier struct{}
 
